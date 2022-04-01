@@ -11,18 +11,19 @@ path/to/ECG_digitized
    └─ lead_12.png
 ```
 
-Given root directory, `ECG_digitized`, containing ECG images (.png) and path to `ECG_Datasheet_sess.csv`, run:
+Given the root directory, `ECG_digitized`, containing ECG images (.png) and path to `ECG_Datasheet_sess.csv`, run:
 ```shell script
 $ python preprocess/preprocess.py \
     /path/to/ECG_digitized \
     --dest /path/to/data \
     --csv-path /path/to/ECG_Datasheet_sess.csv
 ```
-It will convert ECG images (.png) to waveform data (.mat), and output them into `--dest` directory.  
+It will convert ECG images (.png) to waveform data (.mat), and output them into `--dest` directory.
+
 Note that it might take around 3 hours totally.
 
 ## Prepare data manifest
-Given root directory containing pre-processed data, run:
+Given the root directory containing pre-processed data, run:
 ```shell script
 $ python preprocess/manifest.py \
     /path/to/data \
