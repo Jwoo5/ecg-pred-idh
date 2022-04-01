@@ -33,6 +33,8 @@ from sklearn.metrics import roc_auc_score, roc_curve
 
 def get_parser():
     parser = argparse.ArgumentParser()
+
+    # training
     parser.add_argument(
         "--data", type=str, help="path to data manifest directory", required=True
     )

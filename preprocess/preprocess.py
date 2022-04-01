@@ -137,8 +137,8 @@ def get_parser():
         "--dest", default=".", type=str, metavar="DIR", help="output directory"
     )
     parser.add_argument(
-        "--meta-dir", default=".", type=str, metavar="DIR",
-        help="directory containing 'ECG_Datasheet_sess.csv' so that we can "
+        "--csv-path", default=".", type=str, metavar="DIR",
+        help="path to 'ECG_Datasheet_sess.csv' so that we can "
         "link ECG records to their corresponding sessions"
     )
 
@@ -154,7 +154,7 @@ def main(args):
     dir_path = os.path.realpath(args.root)
     search_path = os.path.join(dir_path, "*/")
 
-    sessions = pd.read_csv(os.path.join(args.meta_dir, 'ECG_Datasheet_sess.csv'))
+    sessions = pd.read_csv(args.csv_path)
 
     fnames = glob.glob(search_path)
     for fname in tqdm(fnames):
