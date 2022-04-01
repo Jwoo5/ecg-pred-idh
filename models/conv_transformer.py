@@ -10,9 +10,6 @@ from modules import (
     LayerNorm,
     GradMultiply,
 )
-from models import (
-    Wav2Vec2Model
-)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +34,7 @@ class ConvTransformerModel(nn.Module):
         conv_pos_groups=16,
         layer_norm_first=False,
         num_labels=1,
+        **kwargs,
     ):
         super().__init__()
         self.conv_feature_layers = conv_feature_layers
@@ -116,7 +114,6 @@ class ConvTransformerModel(nn.Module):
         
         features = features.transpose(1,2)
         features = self.layer_norm(features)
-        unmasked_features = features.clone()
 
         if padding_mask is not None and padding_mask.any():
             input_lengths = (1 - padding_mask.long()).sum(-1)
@@ -146,19 +143,14 @@ class ConvTransformerModel(nn.Module):
         if self.post_extract_proj is not None:
             features = self.post_extract_proj(features)
         
-        features = self.dropout_input(features)
-        unmasked_features = self.dropout_features(unmasked_features)
-
-        if mask:
-            x, mask_indices = self.apply_mask(
-                features,
-                padding_mask,
-                mask_indices=mask_indices
-            )
+        x = self.dropout_input(features)
 
         x = self.encoder(x, padding_mask=padding_mask)
 
-        return {"x": x, "padding_mask": padding_mask, "featuers": unmasked_features}
+        x = torch.div(x.sum(dim=1), (x != 0).sum(dim=1))
+        x = self.final_proj(x)
+
+        return {"x": x, "padding_mask": padding_mask}
     
     def get_logits(self, net_output, normalize=False):
         logits = net_output["x"].float()
@@ -169,28 +161,4 @@ class ConvTransformerModel(nn.Module):
         return logits
     
     def get_targets(self, sample, net_output):
-        return sample["label"].squeeze(-1).float()
-    
-    @classmethod
-    def from_pretrained(
-        cls,
-        model_path,
-        model_name='wav2vec2',
-        **kwargs,
-    ):
-        state = torch.load(model_path, map_location=torch.device('cpu'))
-        
-        if model_name == 'wav2vec2':
-            model = Wav2Vec2Model(**kwargs)
-        else:
-            raise NotImplementedError(
-                "only support wav2vec2 model for loading pre-trained weights"
-            )
-        
-        model.load_state_dict(state['model'], strict=True)
-        if hasattr(model, 'remove_pretraining_modules'):
-            model.remove_pretraining_modules()
-        
-        logger.info(f"loaded pre-trained model parameters from {model_path}")
-
-        return model
+        return sample["label"].float()

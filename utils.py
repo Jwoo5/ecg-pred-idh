@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import torch
 import torch.nn.functional as F
 
@@ -8,6 +10,14 @@ def buffered_arange(max):
         buffered_arange.buf.resize_(max)
         torch.arange(max, out=buffered_arange.buf)
     return buffered_arange.buf[:max]
+
+@contextmanager
+def rename_logger(logger, new_name):
+    old_name = logger.name
+    if new_name is not None:
+        logger.name = new_name
+    yield logger
+    logger.name = old_name
 
 def should_stop_early(patience, valid_auroc: float) -> bool:
     def is_better(a, b):

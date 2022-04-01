@@ -1,7 +1,12 @@
 import argparse
 import logging
+import logging.config
 import os
 import sys
+
+from sklearn.metrics import roc_auc_score, average_precision_score
+
+import pprint
 
 # should setup root logger before importing any relevant libraries.
 logging.basicConfig(
@@ -21,7 +26,7 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 import utils
-from .data import FileECGDataset
+from data import FileECGDataset
 from models import ConvTransformerModel
 
 from sklearn.metrics import roc_auc_score, roc_curve
@@ -29,7 +34,7 @@ from sklearn.metrics import roc_auc_score, roc_curve
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data", type=str, help="path to data directory", required=True
+        "--data", type=str, help="path to data manifest directory", required=True
     )
     parser.add_argument(
         "--label", type=str, default="idh_a", choices=["idh_a", "idh_b", "idh_ab"],
@@ -43,7 +48,7 @@ def get_parser():
         "--bsz", type=int, default=64
     )
     parser.add_argument(
-        "--lr", type=float, default=0.0001
+        "--lr", type=float, default=0.00005
     )
     parser.add_argument(
         "--max_epoch", type=int, default=100
@@ -53,21 +58,13 @@ def get_parser():
         help="patient for early stopping, if set <=0 don't stop early"
     )
     parser.add_argument(
-        "--save_dir", type=str, default='.'
+        "--save_dir", type=str, default='checkpoints'
     )
 
-    # loading pre-trained model
+    # logging
     parser.add_argument(
-        "--load_pretrained_weights", type=bool, default=False, action="store_true",
-        help="whether to load model weights from pre-trained checkpoint"
-    )
-    parser.add_argument(
-        "--pretrained_model_name", type=str, default="wav2vec2", choices=["wav2vec2"],
-        help="pre-trained model name to be loaded. the only available is wav2vec2 currently"
-    )
-    parser.add_argument(
-        "--pretrained_model_path", type=str, default="checkpoint.pt",
-        help="path to pre-trained checkpoint"
+        "--log_interval", type=int, default=50,
+        help="print log every `--log_interval` step"
     )
 
     # convnets
@@ -119,7 +116,7 @@ def get_parser():
         "set to encoder_embed_dim is <= 0"
     )
     parser.add_argument(
-        "--layer_norm_first", type=bool, default=False, action="store_true",
+        "--layer_norm_first", default=False, action="store_true",
         help="apply layernorm first in the transformer"
     )
 
@@ -134,6 +131,10 @@ def get_parser():
     )
     parser.add_argument(
         "--activation_dropout", type=float, default=0.0,
+        help="dropout probability after activation in FFN"
+    )
+    parser.add_argument(
+        "--encoder_layerdrop", type=float, default=0.0,
         help="probability of dropping a transformer layer"
     )
     parser.add_argument(
@@ -151,7 +152,7 @@ def get_parser():
         help="mask length"
     )
     parser.add_argument(
-        "--mask_prob", type=float, defualt=0.65,
+        "--mask_prob", type=float, default=0.65,
         help="probability of replacing a token with mask"
     )
     parser.add_argument(
@@ -165,7 +166,7 @@ def get_parser():
         "see help in compute_mask_indices"
     )
     parser.add_argument(
-        "--no_mask_overlap", type=bool, default=False, action="store_true",
+        "--no_mask_overlap", default=False, action="store_true",
         help="whether to allow masks to overlap"
     )
     parser.add_argument(
@@ -193,7 +194,7 @@ def get_parser():
         "(deprecated)"
     )
     parser.add_argument(
-        "no_mask_channel_overlap", type=bool, default=False, action="store_true",
+        "no_mask_channel_overlap", default=False, action="store_true",
         help="whether to allow channel masks to overlap"
     )
     parser.add_argument(
@@ -207,7 +208,7 @@ def get_parser():
         help="number of filters for convolutional positional embeddings"
     )
     parser.add_argument(
-        "--conv_pos_gropus", type=int, default=16,
+        "--conv_pos_groups", type=int, default=16,
         help="number of groups for convolutional positional embeddings"
     )
 
@@ -215,6 +216,7 @@ def get_parser():
 
 def main(args):
     set_struct(vars(args))
+    logger.info(pprint.pformat(vars(args)))
 
     valid_subsets = args.valid_subset.replace(' ', '').split(',')
 
@@ -227,7 +229,182 @@ def main(args):
         max_sample_size=None,
         min_sample_size=0,
         pad=True,
+        label_key=args.label,
     )
+    dataset['train'] = DataLoader(
+        ds,
+        batch_size=args.bsz,
+        shuffle=True,
+        collate_fn=ds.collator
+    )
+    for valid in valid_subsets:
+        ds = FileECGDataset(
+            manifest_path=os.path.join(args.data, valid+'.tsv'),
+            max_sample_size=None,
+            min_sample_size=0,
+            pad=True,
+            label_key=args.label,
+        )
+        dataset[valid] = DataLoader(
+            ds,
+            batch_size=args.bsz,
+            shuffle=False,
+            collate_fn=ds.collator
+        )
+
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device('cpu')
+
+    model = ConvTransformerModel(
+        conv_feature_layers=args.conv_feature_layers,
+        in_d=args.in_d,
+        conv_bias=args.conv_bias,
+        feature_grad_mult=args.feature_grad_mult,
+        encoder_layers=args.encoder_layers,
+        encoder_embed_dim=args.encoder_embed_dim,
+        encoder_ffn_embed_dim=args.encoder_ffn_embed_dim,
+        encoder_attention_heads=args.encoder_attention_heads,
+        dropout=args.dropout,
+        attention_dropout=args.attention_dropout,
+        activation_dropout=args.activation_dropout,
+        encoder_layerdrop=args.encoder_layerdrop,
+        dropout_input=args.dropout_input,
+        dropout_features=args.dropout_features,
+        conv_pos=args.conv_pos,
+        conv_pos_groups=args.conv_pos_groups,
+        layer_norm_first=args.layer_norm_first,
+        num_labels=2 if args.label == 'idh_ab' else 1,
+    )
+    model = model.to(device)
+    optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
+    criterion = nn.BCEWithLogitsLoss() if args.label == 'idh_ab' else nn.BCELoss()
+
+    logger.info(model)
+    logger.info(f"task: {args.label}")
+    logger.info(f"model: {model.__class__.__name__}")
+    logger.info(
+        "num. model params: {:,} (num. trained: {:,})".format(
+            sum(p.numel() for p in model.parameters()),
+            sum(p.numel() for p in model.parameters() if p.requires_grad)
+        )
+    )
+
+    for epoch in range(args.max_epoch):
+        logger.info(f"begin training epoch {epoch}")
+        logger.info("Start iterating over samples")
+
+        probs = {'train': []}
+        truth = {'train': []}
+        total_loss = {'train': 0}
+        auroc = {'train': 0}
+        auprc = {'train': 0}
+        for v in valid_subsets:
+            probs[v] = []
+            truth[v] = []
+            total_loss[v] = 0
+            auroc[v] = 0
+            auprc[v] = 0
+
+        for i, sample in enumerate(dataset['train']):
+            model.train()
+            criterion.train()
+            optimizer.zero_grad()
+
+            sample = utils.prepare_sample(sample)
+            net_output = model(**sample["net_input"])
+            logits = model.get_logits(net_output)
+            if args.label != 'idh_ab':
+                logits = torch.sigmoid(logits).squeeze(-1)
+            targets = model.get_targets(sample, net_output)
+
+            loss = criterion(logits, targets)
+
+            loss.backward()
+            optimizer.step()
+
+            total_loss['train'] += loss.detach()
+
+            if  (i+1) % args.log_interval == 0:
+                with utils.rename_logger(logger, 'train'):
+                    logger.info(
+                        'epoch: {}, update: {:.2f}, avg_loss: {:.3f}'.format(
+                            epoch+1, epoch+(i/len(dataset['train'])), total_loss['train'] / (i+1)
+                        )
+                    )
+
+            with torch.no_grad():
+                truth['train'].append(
+                    targets.cpu().numpy()
+                )
+                probs['train'].append(
+                    torch.sigmoid(logits).cpu().numpy()
+                )
+        
+        for v in valid_subsets:
+            logger.info(f'begin validation on "{v}" subset')
+
+            for sample in dataset[v]:
+                model.eval()
+                criterion.eval()
+                sample = utils.prepare_sample(sample)
+
+                with torch.no_grad():
+                    net_output = model(**sample['net_input'])
+                    logits = model.get_logits(net_output)
+                    if args.label != 'idh_ab':
+                        logits = torch.sigmoid(logits).squeeze(-1)
+                    targets = model.get_targets(sample, net_output)
+
+                    loss = criterion(logits, targets)
+                    total_loss[v] += loss
+
+                    truth[v].append(
+                        targets.cpu().numpy()
+                    )
+                    probs[v].append(
+                        torch.sigmoid(logits).cpu().numpy()
+                    )
+            
+            truth[v] = np.concatenate(truth[v], axis=0)
+            probs[v] = np.concatenate(probs[v], axis=0)
+            auroc[v] = roc_auc_score(y_true=truth[v], y_score=probs[v], average='micro')
+            auprc[v] = average_precision_score(y_true=truth[v], y_score=probs[v], average='micro')
+            with utils.rename_logger(logger, v):
+                logger.info(
+                    'epoch: {}, {}_loss: {:.3f}, {}_auroc: {:.3f}, {}_auprc: {:.3f}'.format(
+                        epoch+1, v, total_loss[v] / len(dataset[v]), v, auroc[v], v, auprc[v]
+                    )
+                )
+
+        truth['train'] = np.concatenate(truth['train'], axis=0)
+        probs['train'] = np.concatenate(probs['train'], axis=0)
+        auroc['train'] = roc_auc_score(y_true=truth['train'], y_score=probs['train'], average='micro')
+        auprc['train'] = average_precision_score(y_true=truth['train'], y_score=probs['train'], average='micro')
+        with utils.rename_logger(logger, 'train'):
+            logger.info(f'end of epoch {epoch+1} (average epoch stats below)')
+            logger.info(
+                'epoch: {}, train_loss: {:.3f}, train_auroc: {:.3f}, train_auprc: {:.3f}'.format(
+                    epoch+1, total_loss['train'] / len(dataset['train']), auroc['train'], auprc['train']
+                )
+            )
+        
+        should_stop = utils.should_stop_early(args.patience, auroc['valid'])
+        if utils.should_stop_early.best == auroc:
+            state_dict = {
+                'model': model.state_dict(),
+                'epoch': epoch+1,
+                'valid_auroc': auroc['valid'],
+                'loss': total_loss['valid'] / len(dataset['valid'])
+            }
+            torch.save(
+                state_dict,
+                os.path.join(args.save_dir, 'checkpoint_best.pt')
+            )
+        
+        if should_stop:
+            logger.info(
+                f"early stop since valid performance hasn't improved for last {args.patience} runs"
+            )
+            break
 
 def set_struct(cfg: dict):
     root = os.path.abspath(
