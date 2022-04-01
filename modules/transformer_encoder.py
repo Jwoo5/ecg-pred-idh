@@ -38,38 +38,50 @@ def init_bert_params(module):
         module.W_V.weight.data.normal_(mean=0.0, std=0.02)
 
 class TransformerEncoder(nn.Module):
-    def __init__(self, args):
+    def __init__(
+        self,
+        encoder_layers,
+        encoder_attention_heads,
+        encoder_ffn_embed_dim,
+        encoder_embed_dim,
+        conv_pos,
+        conv_pos_groups,
+        dropout,
+        attention_dropout,
+        activation_dropout,
+        layer_norm_first,
+    ):
         super().__init__()
 
-        self.dropout = args.dropout
-        self.embedding_dim = args.encoder_embed_dim
+        self.dropout = dropout
+        self.embedding_dim = encoder_embed_dim
         
         self.pos_conv = nn.Conv1d(
             self.embedding_dim,
             self.embedding_dim,
-            kernel_size = args.conv_pos,
-            padding = args.conv_pos // 2,
-            groups = args.conv_pos_groups,
+            kernel_size = conv_pos,
+            padding = conv_pos // 2,
+            groups = conv_pos_groups,
         )
         dropout = 0
-        std = math.sqrt((4 * (1.0 - dropout)) / (args.conv_pos * self.embedding_dim))
+        std = math.sqrt((4 * (1.0 - dropout)) / (conv_pos * self.embedding_dim))
         nn.init.normal_(self.pos_conv.weight, mean = 0, std = std)
         nn.init.constant_(self.pos_conv.bias, 0)
 
         self.pos_conv = nn.utils.weight_norm(self.pos_conv, name = "weight", dim = 2)
-        self.pos_conv = nn.Sequential(self.pos_conv, SamePad(args.conv_pos), nn.GELU())
+        self.pos_conv = nn.Sequential(self.pos_conv, SamePad(conv_pos), nn.GELU())
 
         self.encoder = TransformerEncoderLayer(
-            n_layer = args.encoder_layers,
+            n_layer = encoder_layers,
             embed_dim = self.embedding_dim,
-            n_heads = args.encoder_attention_heads,
-            ffn_dim = args.encoder_ffn_embed_dim,
+            n_heads = encoder_attention_heads,
+            ffn_dim = encoder_ffn_embed_dim,
             dropout = self.dropout,
-            attention_dropout=args.attention_dropout,
-            activation_dropout=args.activation_dropout            
+            attention_dropout=attention_dropout,
+            activation_dropout=activation_dropout            
         )
 
-        self.layer_norm_first = args.layer_norm_first
+        self.layer_norm_first = layer_norm_first
         self.layer_norm = LayerNorm(self.embedding_dim)
 
         # self.layerdrop = args.encoder_layerdrop

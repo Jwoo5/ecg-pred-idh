@@ -34,7 +34,7 @@ class FileECGDataset(Dataset):
             self.root_dir = f.readline().strip()
             for i, line in enumerate(f):
                 items = line.strip().split('\t')
-                assert len(items) == 1, line
+                assert len(items) == 2, line
 
                 self.fnames.append(items[0])
         
