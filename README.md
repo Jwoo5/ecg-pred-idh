@@ -1,4 +1,10 @@
+# Requirements
+* [PyTorch](https://pytorch.org) version >= 1.5.0
+* Python version >= 3.6
+* **To preprocess ECG datasets**: `pip install scipy==1.3.1`
+
 # Getting started
+
 ## Pre-process
 Before pre-processing, please ensure that your data directory structure is like:
 ```
