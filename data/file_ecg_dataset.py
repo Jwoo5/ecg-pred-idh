@@ -1,4 +1,4 @@
-import warnings
+import logging
 import os
 import sys
 
@@ -7,6 +7,8 @@ import scipy.io
 
 import torch
 from torch.utils.data import Dataset
+
+logger = logging.getLogger(__name__)
 
 class FileECGDataset(Dataset):
     def __init__(
@@ -26,7 +28,7 @@ class FileECGDataset(Dataset):
         self.pad = pad
         self.label_key = label_key
 
-        self.skipped = 0
+        skipped = 0
         self.fnames = []
         self.skipped_indices = set()
 
@@ -37,14 +39,17 @@ class FileECGDataset(Dataset):
                 assert len(items) == 2, line
 
                 self.fnames.append(items[0])
-        
+        logger.info(f"loaded {len(self.fnames)}, skipped {skipped} samples")
+
         try:
             import pyarrow
 
             self.fnames = pyarrow.array(self.fnames)
         except:
-            warnings.warn("Could not create a pyarrow array. Please install pyarrow for better performance.")
-            pass
+            logger.debug(
+                "Could not create a pyarraw array. Please install pyarrow for better performance"
+            )
+        pass
     
     def crop_to_max_size(self, data, target_size):
         size = len(data)
