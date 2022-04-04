@@ -110,19 +110,19 @@ def get_parser():
 
     # transformers
     parser.add_argument(
-        "--encoder_layers", type=int, default=2,
+        "--encoder_layers", type=int, default=8,
         help="num encoder layers in the transformer"
     )
     parser.add_argument(
-        "--encoder_embed_dim", type=int, default=256,
+        "--encoder_embed_dim", type=int, default=768,
         help="encoder embedding dimension"
     )
     parser.add_argument(
-        "--encoder_ffn_embed_dim", type=int, default=1024,
+        "--encoder_ffn_embed_dim", type=int, default=3072,
         help="encoder embedding dimension for FFN"
     )
     parser.add_argument(
-        "--encoder_attention_heads", type=int, default=8,
+        "--encoder_attention_heads", type=int, default=12,
         help="num encoder attention heads"
     )
     parser.add_argument(
