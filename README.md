@@ -2,7 +2,7 @@
 * [PyTorch](https://pytorch.org) version >= 1.5.0
 * Python version >= 3.6
 * **To preprocess ECG datasets**: `pip install scipy==1.3.1`
-
+* **For large datasets** install [PyArrow](https://arrow.apache.org/docs/python/install.html#using-pip): `pip install pyarrow`
 # Getting started
 
 ## Pre-process
