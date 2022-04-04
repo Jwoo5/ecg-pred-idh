@@ -50,7 +50,7 @@ def get_parser():
         "--bsz", type=int, default=64
     )
     parser.add_argument(
-        "--lr", type=float, default=0.00005
+        "--lr", type=float, default=0.0005
     )
     parser.add_argument(
         "--max_epoch", type=int, default=100

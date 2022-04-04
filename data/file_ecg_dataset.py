@@ -87,7 +87,8 @@ class FileECGDataset(Dataset):
                 collated_sources[i] = self.crop_to_max_size(source, target_size)
         
         input = {'source': collated_sources}
-        out = {'label': torch.cat([s['label'] for s in samples])}
+        agg = torch.vstack if self.label_key == 'idh_ab' else torch.cat
+        out = {'label': agg([s['label'] for s in samples])}
 
         if self.pad:
             input['padding_mask'] = padding_mask
