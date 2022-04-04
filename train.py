@@ -63,6 +63,13 @@ def get_parser():
         "--save_dir", type=str, default='checkpoints'
     )
 
+    # criterion
+    parser.add_argument(
+        '--pos_weight', type=str, default=None,
+        help='a weight of positive examples. Must be a vector with length equal to the'
+        'number of classes. (e.g., "[3.0, 2.0, ...]")'
+    )
+
     # logging
     parser.add_argument(
         "--log_interval", type=int, default=50,
@@ -278,7 +285,11 @@ def main(args):
     )
     model = model.to(device)
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
-    criterion = nn.BCEWithLogitsLoss() if args.label == 'idh_ab' else nn.BCELoss()
+    if args.pos_weight:
+        pos_weight = eval(pos_weight)
+        pos_weight = torch.tensor(pos_weight).to(device)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+
 
     logger.info(model)
     logger.info(f"task: {args.label}")
