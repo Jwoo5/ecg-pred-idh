@@ -111,7 +111,7 @@ class ConvTransformerModel(nn.Module):
         else:
             with torch.no_grad():
                 features = self.feature_extractor(source)
-        
+
         features = features.transpose(1,2)
         features = self.layer_norm(features)
 
