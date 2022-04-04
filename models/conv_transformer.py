@@ -158,7 +158,7 @@ class ConvTransformerModel(nn.Module):
         if normalize:
             logits = utils.log_softmax(logits.float(), dim=-1)
         
-        return logits
+        return logits.squeeze(-1)
     
     def get_targets(self, sample, net_output):
         return sample["label"].float()
