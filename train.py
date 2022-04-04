@@ -63,6 +63,12 @@ def get_parser():
         "--save_dir", type=str, default='checkpoints'
     )
 
+    # optimizer
+    parser.add_argument(
+        '--weight_decay', type=float, default=0.0,
+        help='weight decay in optimizer'
+    )
+
     # criterion
     parser.add_argument(
         '--pos_weight', type=str, default=None,
@@ -104,19 +110,19 @@ def get_parser():
 
     # transformers
     parser.add_argument(
-        "--encoder_layers", type=int, default=12,
+        "--encoder_layers", type=int, default=2,
         help="num encoder layers in the transformer"
     )
     parser.add_argument(
-        "--encoder_embed_dim", type=int, default=768,
+        "--encoder_embed_dim", type=int, default=256,
         help="encoder embedding dimension"
     )
     parser.add_argument(
-        "--encoder_ffn_embed_dim", type=int, default=3072,
+        "--encoder_ffn_embed_dim", type=int, default=1024,
         help="encoder embedding dimension for FFN"
     )
     parser.add_argument(
-        "--encoder_attention_heads", type=int, default=12,
+        "--encoder_attention_heads", type=int, default=8,
         help="num encoder attention heads"
     )
     parser.add_argument(
@@ -284,7 +290,7 @@ def main(args):
         num_labels=2 if args.label == 'idh_ab' else 1,
     )
     model = model.to(device)
-    optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
+    optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     pos_weight = args.pos_weight
     if pos_weight:
         pos_weight = eval(pos_weight)
