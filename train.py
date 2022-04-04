@@ -285,7 +285,8 @@ def main(args):
     )
     model = model.to(device)
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=0.01)
-    if args.pos_weight:
+    pos_weight = args.pos_weight
+    if pos_weight:
         pos_weight = eval(pos_weight)
         pos_weight = torch.tensor(pos_weight).to(device)
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
@@ -325,8 +326,6 @@ def main(args):
             sample = utils.prepare_sample(sample)
             net_output = model(**sample["net_input"])
             logits = model.get_logits(net_output)
-            if args.label != 'idh_ab':
-                logits = torch.sigmoid(logits).squeeze(-1)
             targets = model.get_targets(sample, net_output)
 
             loss = criterion(logits, targets)
