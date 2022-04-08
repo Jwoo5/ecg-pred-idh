@@ -194,14 +194,10 @@ def main(args):
         vals = np.array([v[:min_size] for v in vals])
 
         if ecg_grid == 83:
-            feats = []
-            for v in vals:
-                sample_size = len(v) * (157 / ecg_grid)
-                x = np.linspace(0, sample_size - 1, len(v))
-                func = interp1d(x, v, kind='linear')
-                feat = func(list(range(int(sample_size))))
-                feats.append(feat)
-            feats = np.vstack(feats)
+            sample_size = vals.shape[-1] * (157 / ecg_grid)
+            x = np.linspace(0, sample_size - 1, vals.shape[-1])
+            func = interp1d(x, vals, kind='linear')
+            feats = func(list(range(int(sample_size))))
         else:
             feats = vals
 
