@@ -199,7 +199,7 @@ def main(args):
                 sample_size = len(v) * (157 / ecg_grid)
                 x = np.linspace(0, sample_size - 1, len(v))
                 func = interp1d(x, v, kind='linear')
-                feat = func(list(range(int(ecg_grid))))
+                feat = func(list(range(int(sample_size))))
                 feats.append(feat)
             feats = np.vstack(feats)
         else:
